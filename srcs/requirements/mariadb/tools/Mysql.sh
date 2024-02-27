@@ -1,25 +1,32 @@
 #!/bin/bash
 
-# Démarrer le service MySQL
+# Start MySQL service
 service mysql start
 
-# Créer la base de données si elle n'existe pas déjà
-mysql -e "CREATE DATABASE IF NOT EXISTS \`${SQL_DATABASE}\`;"
+# Wait for MySQL to start up
+sleep 10
 
-# Créer l'utilisateur si il n'existe pas déjà, avec le mot de passe spécifié
-mysql -e "CREATE USER IF NOT EXISTS \`${SQL_USER}\`@'localhost' IDENTIFIED BY '${SQL_PASSWORD}';"
+# Use the root password from the environment variable for MySQL commands
+export MYSQL_PWD=$SQL_ROOT_PASSWORD
 
-# Donner tous les privilèges à l'utilisateur sur la base de données
-mysql -e "GRANT ALL PRIVILEGES ON \`${SQL_DATABASE}\`.* TO \`${SQL_USER}\`@'%' IDENTIFIED BY '${SQL_PASSWORD}';"
+# Create the database if it doesn't exist
+mysql -uroot -e "CREATE DATABASE IF NOT EXISTS \`${SQL_DATABASE}\`;"
 
-# Modifier le mot de passe de l'utilisateur root
-mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${SQL_ROOT_PASSWORD}';"
+# Create the user if it doesn't exist, with the specified password
+mysql -uroot -e "CREATE USER IF NOT EXISTS \`${SQL_USER}\`@'localhost' IDENTIFIED BY '${SQL_PASSWORD}';"
+mysql -uroot -e "CREATE USER IF NOT EXISTS \`${SQL_USER}\`@'%' IDENTIFIED BY '${SQL_PASSWORD}';"
 
-# Rafraîchir les privilèges pour prendre en compte les changements
-mysql -e "FLUSH PRIVILEGES;"
+# Grant all privileges to the user on the database
+mysql -uroot -e "GRANT ALL PRIVILEGES ON \`${SQL_DATABASE}\`.* TO \`${SQL_USER}\`@'localhost';"
+mysql -uroot -e "GRANT ALL PRIVILEGES ON \`${SQL_DATABASE}\`.* TO \`${SQL_USER}\`@'%';"
 
-# Arrêter MySQL proprement
-mysqladmin -u root -p$SQL_ROOT_PASSWORD shutdown
+# Flush privileges to apply changes
+mysql -uroot -e "FLUSH PRIVILEGES;"
 
-# Démarrer MySQL sans supervision pour appliquer les changements
-exec mysqld_safe
+# Shutdown MySQL properly
+mysqladmin -uroot shutdown
+
+# The `mysqld_safe` command is used to start MySQL with some safety features,
+# but it's not suitable for the end of this script as it will keep the script running indefinitely.
+# If you need to keep MySQL running in the background, consider removing this line or adjusting your Dockerfile to handle MySQL startup differently.
+# exec mysqld_safe
