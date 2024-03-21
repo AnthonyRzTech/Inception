@@ -1,31 +1,26 @@
+# Utilise Alpine Linux comme image de base
+FROM alpine:3.18
 
-# ==> Create a container from DEBIAN
-FROM debian:buster
+# Installe Nginx et OpenSSL
+RUN apk --no-cache add nginx openssl
 
-# ==> MAJ of apt-get, to get the last version of packages
-RUN apt-get update && apt-get upgrade -y
+# Crée un répertoire pour les certificats SSL et génère un certificat auto-signé
+RUN mkdir -p /etc/nginx/ssl && \
+      openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+      -keyout /etc/ssl/guguKuku.key -out /etc/ssl/camaChameleon.crt \
+      -subj "/C=FR/ST=Normandie/L=LeHavre/O=42 LeHavre/OU=anthrodr/CN=anthrodr.42.fr" \
+      -addext "subjectAltName=DNS:anthrodr.42.fr,DNS:www.anthrodr.42.fr"
 
-# ==> Install NGinx server 
-RUN apt install nginx -y
+# Copie la configuration Nginx dans le conteneur
+COPY ./conf/nginx.conf /etc/nginx/nginx.conf
 
-# ==> Install OpenSSL to generate a self-signed certificate
-RUN apt-get install openssl -y
+# Assure que les fichiers de configuration et le contenu web sont accessibles
+RUN chmod +x /etc/nginx/nginx.conf && \
+    chmod -R 755 /var/www/*
 
-# ==> Create the repertory for the certificate and the key
-RUN mkdir -p /etc/nginx/ssl
+# Expose le port 443 pour le trafic HTTPS
+EXPOSE 443
 
-# ==> Generate a self-signed certificate and key
-RUN openssl req -newkey rsa:4096 -days 42 -nodes -x509 \
--subj "/C=FR/ST=IDF/L=Paris/O=42/OU=42/CN=anthrodr.42.fr/UID=anthrodr" \
--out /etc/ssl/certs/inception.crt \
--keyout /etc/ssl/private/inception.key
+# Exécute Nginx en premier plan
+CMD ["nginx", "-g", "daemon off;"]
 
-# ==> Copy the nginx.conf file into the container
-COPY conf/nginx.conf /etc/nginx/nginx.conf
-
-# ==> Use chmod to give the right to the user to edit html folder
-RUN chmod 755 /var/www/html
-RUN chown -R www-data:www-data /var/www/html
-
-# ==> Start the nginx service
-CMD [ "nginx", "-g", "daemon off;" ]
